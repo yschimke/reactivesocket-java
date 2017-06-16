@@ -23,9 +23,10 @@ import static org.junit.Assert.assertTrue;
 import io.reactivex.subscribers.TestSubscriber;
 import io.rsocket.AbstractRSocket;
 import io.rsocket.Payload;
-import io.rsocket.Plugins;
 import io.rsocket.RSocket;
 import io.rsocket.RSocketFactory;
+import io.rsocket.plugins.DuplexConnectionInterceptor;
+import io.rsocket.plugins.RSocketInterceptor;
 import io.rsocket.transport.netty.client.TcpClientTransport;
 import io.rsocket.transport.netty.server.NettyContextCloseable;
 import io.rsocket.transport.netty.server.TcpServerTransport;
@@ -38,7 +39,6 @@ import java.util.concurrent.atomic.AtomicInteger;
 import org.junit.After;
 import org.junit.Before;
 import org.junit.Test;
-import org.junit.Ignore;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 
@@ -52,30 +52,32 @@ public class IntegrationTest {
   public static volatile boolean calledServer = false;
   public static volatile boolean calledFrame = false;
 
+  private static final RSocketInterceptor clientPlugin;
+  private static final RSocketInterceptor serverPlugin;
+  private static final DuplexConnectionInterceptor connectionPlugin;
+
   static {
-    Plugins.CLIENT_REACTIVE_SOCKET_INTERCEPTOR =
+    clientPlugin =
         reactiveSocket ->
-            Mono.just(
-                new RSocketProxy(reactiveSocket) {
-                  @Override
-                  public Mono<Payload> requestResponse(Payload payload) {
-                    calledClient = true;
-                    return reactiveSocket.requestResponse(payload);
-                  }
-                });
+            new RSocketProxy(reactiveSocket) {
+              @Override
+              public Mono<Payload> requestResponse(Payload payload) {
+                calledClient = true;
+                return reactiveSocket.requestResponse(payload);
+              }
+            };
 
-    Plugins.SERVER_REACTIVE_SOCKET_INTERCEPTOR =
+    serverPlugin =
         reactiveSocket ->
-            Mono.just(
-                new RSocketProxy(reactiveSocket) {
-                  @Override
-                  public Mono<Payload> requestResponse(Payload payload) {
-                    calledServer = true;
-                    return reactiveSocket.requestResponse(payload);
-                  }
-                });
+            new RSocketProxy(reactiveSocket) {
+              @Override
+              public Mono<Payload> requestResponse(Payload payload) {
+                calledServer = true;
+                return reactiveSocket.requestResponse(payload);
+              }
+            };
 
-    Plugins.DUPLEX_CONNECTION_INTERCEPTOR =
+    connectionPlugin =
         (type, connection) -> {
           calledFrame = true;
           return connection;
@@ -91,6 +93,8 @@ public class IntegrationTest {
 
     server =
         RSocketFactory.receive()
+            .addServerPlugin(serverPlugin)
+            .addConnectionPlugin(connectionPlugin)
             .acceptor(
                 (setup, sendingSocket) -> {
                   sendingSocket
@@ -120,6 +124,8 @@ public class IntegrationTest {
 
     client =
         RSocketFactory.connect()
+            .addClientPlugin(clientPlugin)
+            .addConnectionPlugin(connectionPlugin)
             .transport(TcpClientTransport.create(server.address()))
             .start()
             .block();
@@ -130,7 +136,6 @@ public class IntegrationTest {
     server.close().block();
   }
 
-  @Ignore
   @Test(timeout = 5_000L)
   public void testRequest() {
     client.requestResponse(new PayloadImpl("REQUEST", "META")).block();
@@ -140,7 +145,6 @@ public class IntegrationTest {
     assertTrue(calledFrame);
   }
 
-  @Ignore
   @Test
   public void testStream() throws Exception {
     TestSubscriber subscriber = TestSubscriber.create();
@@ -151,7 +155,6 @@ public class IntegrationTest {
     subscriber.assertNotComplete();
   }
 
-  @Ignore
   @Test(timeout = 5_000L)
   public void testClose() throws ExecutionException, InterruptedException, TimeoutException {
     client.close().block();
