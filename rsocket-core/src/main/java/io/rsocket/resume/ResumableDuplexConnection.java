@@ -9,26 +9,30 @@ import reactor.core.publisher.Mono;
 
 public class ResumableDuplexConnection implements DuplexConnection {
   private final ResumeCache cache;
-  private final ResumeToken token;
+  private @Nullable ResumeToken token;
   private @Nullable DuplexConnection connection;
+  private Status status;
 
-  public ResumableDuplexConnection(ResumeCache cache, ResumeToken token) {
+  public ResumableDuplexConnection(ResumeCache cache) {
     this.cache = cache;
-    this.token = token;
   }
 
   public enum Status {
-    DISCONNECTED,
+    NEW,
     CONNECTED,
+    DISCONNECTED,
     CLOSED
   }
 
   @Override public double availability() {
-    return 0;
+    return ;
   }
 
   @Override public Mono<Void> close() {
-    return null;
+    return Mono.fromRunnable(() -> {
+      status = Status.CLOSED;
+      connection = null;
+    });
   }
 
   @Override public Mono<Void> onClose() {
