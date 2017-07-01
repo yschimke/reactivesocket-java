@@ -75,32 +75,6 @@ public class SetupFrameFlyweight {
       int flags,
       final int keepaliveInterval,
       final int maxLifetime,
-      final String metadataMimeType,
-      final String dataMimeType,
-      final ByteBuf metadata,
-      final ByteBuf data) {
-    if ((flags & FLAGS_RESUME_ENABLE) != 0) {
-      throw new IllegalArgumentException("RESUME_ENABLE not supported");
-    }
-
-    return encode(
-        byteBuf,
-        flags,
-        keepaliveInterval,
-        maxLifetime,
-        Unpooled.EMPTY_BUFFER,
-        metadataMimeType,
-        dataMimeType,
-        metadata,
-        data);
-  }
-
-  // Only exposed for testing, other code shouldn't create frames with resumption tokens for now
-  static int encode(
-      final ByteBuf byteBuf,
-      int flags,
-      final int keepaliveInterval,
-      final int maxLifetime,
       final ByteBuf resumeToken,
       final String metadataMimeType,
       final String dataMimeType,

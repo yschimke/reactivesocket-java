@@ -16,14 +16,14 @@
 
 package io.rsocket.frame;
 
-import static org.junit.Assert.*;
-
 import io.netty.buffer.ByteBuf;
 import io.netty.buffer.ByteBufUtil;
 import io.netty.buffer.Unpooled;
 import io.rsocket.FrameType;
 import java.nio.charset.StandardCharsets;
 import org.junit.Test;
+
+import static org.junit.Assert.assertEquals;
 
 public class SetupFrameFlyweightTest {
   private final ByteBuf byteBuf = Unpooled.buffer(1024);
@@ -32,7 +32,8 @@ public class SetupFrameFlyweightTest {
   public void validFrame() {
     ByteBuf metadata = Unpooled.wrappedBuffer(new byte[] {1, 2, 3, 4});
     ByteBuf data = Unpooled.wrappedBuffer(new byte[] {5, 4, 3});
-    SetupFrameFlyweight.encode(byteBuf, 0, 5, 500, "metadata_type", "data_type", metadata, data);
+    SetupFrameFlyweight.encode(byteBuf, 0, 5, 500,
+        Unpooled.EMPTY_BUFFER, "metadata_type", "data_type", metadata, data);
 
     metadata.resetReaderIndex();
     data.resetReaderIndex();
@@ -51,6 +52,7 @@ public class SetupFrameFlyweightTest {
         SetupFrameFlyweight.FLAGS_RESUME_ENABLE,
         5,
         500,
+        Unpooled.EMPTY_BUFFER,
         "",
         "",
         Unpooled.EMPTY_BUFFER,
@@ -95,6 +97,7 @@ public class SetupFrameFlyweightTest {
             0,
             5000,
             60000,
+            Unpooled.EMPTY_BUFFER,
             "mdmt",
             "dmt",
             Unpooled.copiedBuffer("md", StandardCharsets.UTF_8),

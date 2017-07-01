@@ -18,6 +18,7 @@ package io.rsocket;
 import io.netty.buffer.ByteBuf;
 import io.netty.buffer.ByteBufAllocator;
 import io.netty.buffer.ByteBufHolder;
+import io.netty.buffer.ByteBufUtil;
 import io.netty.buffer.Unpooled;
 import io.netty.util.IllegalReferenceCountException;
 import io.netty.util.Recycler;
@@ -31,11 +32,14 @@ import io.rsocket.frame.RequestFrameFlyweight;
 import io.rsocket.frame.RequestNFrameFlyweight;
 import io.rsocket.frame.SetupFrameFlyweight;
 import io.rsocket.frame.VersionFlyweight;
+import io.rsocket.resume.ResumeToken;
 import java.nio.ByteBuffer;
 import java.nio.charset.StandardCharsets;
 import javax.annotation.Nullable;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+
+import static io.rsocket.frame.SetupFrameFlyweight.FLAGS_RESUME_ENABLE;
 
 /**
  * Represents a Frame sent over a {@link DuplexConnection}.
@@ -284,7 +288,8 @@ public class Frame implements ByteBufHolder {
         int maxLifetime,
         String metadataMimeType,
         String dataMimeType,
-        Payload payload) {
+        Payload payload,
+        @Nullable ResumeToken resumeToken) {
       final ByteBuf metadata =
           payload.getMetadata() != null
               ? Unpooled.wrappedBuffer(payload.getMetadata())
@@ -303,16 +308,32 @@ public class Frame implements ByteBufHolder {
                   dataMimeType,
                   metadata.readableBytes(),
                   data.readableBytes()));
-      frame.content.writerIndex(
-          SetupFrameFlyweight.encode(
-              frame.content,
-              flags,
-              keepaliveInterval,
-              maxLifetime,
-              metadataMimeType,
-              dataMimeType,
-              metadata,
-              data));
+
+
+      ByteBuf resumeBytes;
+      if (resumeToken != null) {
+        if ((flags & FLAGS_RESUME_ENABLE) == 0) {
+          throw new IllegalArgumentException("RESUME_ENABLE not set");
+        }
+        resumeBytes = Unpooled.wrappedBuffer(resumeToken.toByteArray());
+      } else {
+        if ((flags & FLAGS_RESUME_ENABLE) != 0) {
+          throw new IllegalArgumentException("RESUME_ENABLE set");
+        }
+        resumeBytes = Unpooled.EMPTY_BUFFER;
+      }
+
+      int length = SetupFrameFlyweight.encode(
+          frame.content,
+          flags,
+          keepaliveInterval,
+          maxLifetime,
+          resumeBytes,
+          metadataMimeType,
+          dataMimeType,
+          metadata,
+          data);
+      frame.content.writerIndex(length);
       return frame;
     }
 

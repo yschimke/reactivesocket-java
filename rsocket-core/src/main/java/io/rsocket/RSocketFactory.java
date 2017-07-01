@@ -255,7 +255,8 @@ public interface RSocketFactory {
                           (int) ackTimeout.toMillis() * missedAcks,
                           metadataMimeType,
                           dataMimeType,
-                          setupPayload);
+                          setupPayload,
+                          null);
 
                   if (mtu > 0) {
                     connection = new FragmentationDuplexConnection(connection, mtu);
