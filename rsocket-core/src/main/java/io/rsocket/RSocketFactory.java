@@ -17,6 +17,7 @@
 package io.rsocket;
 
 import io.rsocket.exceptions.InvalidSetupException;
+import io.rsocket.exceptions.RejectedSetupException;
 import io.rsocket.fragmentation.FragmentationDuplexConnection;
 import io.rsocket.frame.SetupFrameFlyweight;
 import io.rsocket.frame.VersionFlyweight;
@@ -25,6 +26,7 @@ import io.rsocket.plugins.DuplexConnectionInterceptor;
 import io.rsocket.plugins.PluginRegistry;
 import io.rsocket.plugins.Plugins;
 import io.rsocket.plugins.RSocketInterceptor;
+import io.rsocket.resume.ResumeToken;
 import io.rsocket.transport.ClientTransport;
 import io.rsocket.transport.ServerTransport;
 import io.rsocket.util.PayloadImpl;
@@ -33,6 +35,8 @@ import java.util.function.Consumer;
 import java.util.function.Function;
 import java.util.function.Supplier;
 import reactor.core.publisher.Mono;
+
+import javax.annotation.Nullable;
 
 /** Factory for creating RSocket clients and servers. */
 public interface RSocketFactory {
@@ -48,6 +52,11 @@ public interface RSocketFactory {
 
   interface Start<T extends Closeable> {
     Mono<T> start();
+  }
+
+  interface Resume<T> {
+    T resumptionToken(ResumeToken token);
+    T resumptionToken();
   }
 
   interface SetupPayload<T> {
@@ -113,7 +122,8 @@ public interface RSocketFactory {
           Transport<ClientTransport, RSocket>,
           Fragmentation<ClientRSocketFactory, ClientTransport, Function<RSocket, RSocket>, RSocket>,
           ErrorConsumer<ClientRSocketFactory, ClientTransport, Function<RSocket, RSocket>, RSocket>,
-          SetupPayload<ClientRSocketFactory> {
+          SetupPayload<ClientRSocketFactory>,
+          Resume<ClientRSocketFactory> {
 
     private Supplier<Function<RSocket, RSocket>> acceptor =
         () -> rSocket -> new AbstractRSocket() {};
@@ -132,6 +142,7 @@ public interface RSocketFactory {
 
     private String metadataMimeType = "application/binary";
     private String dataMimeType = "application/binary";
+    private @Nullable ResumeToken resumeToken;
 
     public ClientRSocketFactory addConnectionPlugin(DuplexConnectionInterceptor interceptor) {
       plugins.addConnectionPlugin(interceptor);
@@ -240,6 +251,17 @@ public interface RSocketFactory {
       return this;
     }
 
+    @Override
+    public ClientRSocketFactory resumptionToken(ResumeToken token) {
+      this.resumeToken = token;
+      return this;
+    }
+
+    @Override
+    public ClientRSocketFactory resumptionToken() {
+      return resumptionToken(ResumeToken.generate());
+    }
+
     protected class StartClient implements Start<RSocket> {
       @Override
       public Mono<RSocket> start() {
@@ -256,7 +278,7 @@ public interface RSocketFactory {
                           metadataMimeType,
                           dataMimeType,
                           setupPayload,
-                          null);
+                          resumeToken);
 
                   if (mtu > 0) {
                     connection = new FragmentationDuplexConnection(connection, mtu);
@@ -368,15 +390,40 @@ public interface RSocketFactory {
                   ClientServerInputMultiplexer multiplexer =
                       new ClientServerInputMultiplexer(connection, plugins);
 
-                  return multiplexer
-                      .asStreamZeroConnection()
+                  return multiplexer.asStreamZeroConnection()
                       .receive()
                       .next()
-                      .flatMap(setupFrame -> processSetupFrame(multiplexer, setupFrame));
+                      .flatMap(setupFrame -> processInitialFrame(multiplexer, setupFrame));
                 });
       }
 
-      private Mono<? extends Void> processSetupFrame(
+      private Mono<? extends Void> processInitialFrame(ClientServerInputMultiplexer multiplexer, Frame initialFrame) {
+        if (initialFrame.getType() == FrameType.SETUP) {
+          return processSetupFrame(multiplexer, initialFrame);
+        } else if (initialFrame.getType() == FrameType.RESUME) {
+          return processResumeFrame(multiplexer, initialFrame);
+        } else {
+          InvalidSetupException error =
+                  new InvalidSetupException(
+                          "Unexpected initial frame of type " + initialFrame.getType());
+          return multiplexer
+                  .asStreamZeroConnection()
+                  .sendOne(Frame.Error.from(0, error))
+                  .then(multiplexer.close());
+        }
+      }
+
+      private Mono<Void> processResumeFrame(ClientServerInputMultiplexer multiplexer, Frame initialFrame) {
+        InvalidSetupException error =
+                new Connection(
+                        "Unsupported version " + VersionFlyweight.toString(version));
+        return multiplexer
+                .asStreamZeroConnection()
+                .sendOne(Frame.Error.from(0, error))
+                .then(multiplexer.close());
+      }
+
+      private Mono<Void> processSetupFrame(
           ClientServerInputMultiplexer multiplexer, Frame setupFrame) {
         int version = Frame.Setup.version(setupFrame);
         if (version != SetupFrameFlyweight.CURRENT_VERSION) {
@@ -387,6 +434,14 @@ public interface RSocketFactory {
               .asStreamZeroConnection()
               .sendOne(Frame.Error.from(0, error))
               .then(multiplexer.close());
+        }
+
+        if (setupFrame.isFlagSet(SetupFrameFlyweight.FLAGS_RESUME_ENABLE)) {
+          RejectedSetupException error = new RejectedSetupException("Resume not supported");
+          return multiplexer
+                  .asStreamZeroConnection()
+                  .sendOne(Frame.Error.from(0, error))
+                  .then(multiplexer.close());
         }
 
         ConnectionSetupPayload setupPayload = ConnectionSetupPayload.create(setupFrame);

@@ -257,6 +257,10 @@ public class Frame implements ByteBufHolder {
     return FrameHeaderFlyweight.flags(content);
   }
 
+  public boolean isFlagSet(int flag) {
+    return isFlagSet(flags(), flag);
+  }
+
   /**
    * Acquire a free Frame backed by given ByteBuf
    *
@@ -312,12 +316,12 @@ public class Frame implements ByteBufHolder {
 
       ByteBuf resumeBytes;
       if (resumeToken != null) {
-        if ((flags & FLAGS_RESUME_ENABLE) == 0) {
+        if (!isFlagSet(flags, FLAGS_RESUME_ENABLE)) {
           throw new IllegalArgumentException("RESUME_ENABLE not set");
         }
         resumeBytes = Unpooled.wrappedBuffer(resumeToken.toByteArray());
       } else {
-        if ((flags & FLAGS_RESUME_ENABLE) != 0) {
+        if (isFlagSet(flags, FLAGS_RESUME_ENABLE)) {
           throw new IllegalArgumentException("RESUME_ENABLE set");
         }
         resumeBytes = Unpooled.EMPTY_BUFFER;
@@ -368,6 +372,10 @@ public class Frame implements ByteBufHolder {
       ensureFrameType(FrameType.SETUP, frame);
       return SetupFrameFlyweight.dataMimeType(frame.content);
     }
+  }
+
+  public static boolean isFlagSet(int flags, int flag) {
+    return (flags & flag) != 0;
   }
 
   public static class Error {
