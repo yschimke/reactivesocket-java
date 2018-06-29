@@ -24,12 +24,12 @@ import io.rsocket.transport.netty.TcpDuplexConnection;
 import java.net.InetSocketAddress;
 import java.util.Objects;
 import reactor.core.publisher.Mono;
-import reactor.ipc.netty.tcp.TcpClient;
+import reactor.netty.tcp.TcpClient;
 
 /**
  * An implementation of {@link ClientTransport} that connects to a {@link ServerTransport} via TCP.
  */
-public final class TcpClientTransport implements ClientTransport {
+public final class TcpClientTransport implements ClientTransport<TcpClientTransport> {
 
   private final TcpClient client;
 
@@ -88,6 +88,13 @@ public final class TcpClientTransport implements ClientTransport {
     Objects.requireNonNull(client, "client must not be null");
 
     return new TcpClientTransport(client);
+  }
+
+  @Override
+  public TcpClientTransport withDebug() {
+//    client.options().with
+
+    return this;
   }
 
   @Override

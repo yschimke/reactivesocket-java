@@ -23,7 +23,7 @@ import io.rsocket.transport.netty.TcpDuplexConnection;
 import java.net.InetSocketAddress;
 import java.util.Objects;
 import reactor.core.publisher.Mono;
-import reactor.ipc.netty.tcp.TcpServer;
+import reactor.netty.tcp.TcpServer;
 
 /**
  * An implementation of {@link ServerTransport} that connects to a {@link ClientTransport} via TCP.
@@ -43,7 +43,7 @@ public final class TcpServerTransport implements ServerTransport<NettyContextClo
    * @return a new instance
    */
   public static TcpServerTransport create(int port) {
-    TcpServer server = TcpServer.create(port);
+    TcpServer server = TcpServer.create().port(port);
     return create(server);
   }
 
@@ -58,7 +58,7 @@ public final class TcpServerTransport implements ServerTransport<NettyContextClo
   public static TcpServerTransport create(String bindAddress, int port) {
     Objects.requireNonNull(bindAddress, "bindAddress must not be null");
 
-    TcpServer server = TcpServer.create(bindAddress, port);
+    TcpServer server = TcpServer.create().host(bindAddress).port(port);
     return create(server);
   }
 
@@ -72,7 +72,7 @@ public final class TcpServerTransport implements ServerTransport<NettyContextClo
   public static TcpServerTransport create(InetSocketAddress address) {
     Objects.requireNonNull(address, "address must not be null");
 
-    TcpServer server = TcpServer.create(address.getHostName(), address.getPort());
+    TcpServer server = TcpServer.create().host(address.getHostName()).port(address.getPort());
     return create(server);
   }
 
@@ -93,8 +93,7 @@ public final class TcpServerTransport implements ServerTransport<NettyContextClo
   public Mono<NettyContextCloseable> start(ConnectionAcceptor acceptor) {
     Objects.requireNonNull(acceptor, "acceptor must not be null");
 
-    return server
-        .newHandler(
+    return server.handle(
             (in, out) -> {
               in.context().addHandler(new RSocketLengthCodec());
               TcpDuplexConnection connection = new TcpDuplexConnection(in, out, in.context());

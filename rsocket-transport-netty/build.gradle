@@ -23,7 +23,7 @@ plugins {
 
 dependencies {
     api project(':rsocket-core')
-    api 'io.projectreactor.ipc:reactor-netty'
+    api 'io.projectreactor.netty:reactor-netty:0.8.0.BUILD-SNAPSHOT'
 
     compileOnly 'com.google.code.findbugs:jsr305'
 
@@ -37,3 +37,8 @@ dependencies {
 }
 
 description = 'Reactor Netty RSocket transport implementations (TCP, Websocket)'
+
+repositories {
+    mavenCentral()
+    maven { url 'http://repo.spring.io/libs-snapshot' }
+}

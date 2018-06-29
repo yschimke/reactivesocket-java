@@ -46,6 +46,11 @@ final class WebsocketSecureTransportTest implements TransportTest {
                   HttpServer.create(options -> options.listenAddress(address).sslSelfSigned())));
 
   @Override
+  public void requestChannel2_000_000() {
+    // disable
+  }
+
+  @Override
   public Duration getTimeout() {
     return Duration.ofMinutes(3);
   }

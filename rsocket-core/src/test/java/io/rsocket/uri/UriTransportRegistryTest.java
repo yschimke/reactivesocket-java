@@ -26,7 +26,7 @@ import org.junit.Test;
 public class UriTransportRegistryTest {
   @Test
   public void testTestRegistered() {
-    ClientTransport test = UriTransportRegistry.clientForUri("test://test");
+    ClientTransport<?> test = UriTransportRegistry.clientForUri("test://test");
 
     DuplexConnection duplexConnection = test.connect().block();
 

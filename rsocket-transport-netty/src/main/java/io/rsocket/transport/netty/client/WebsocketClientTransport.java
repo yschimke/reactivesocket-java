@@ -37,7 +37,7 @@ import reactor.ipc.netty.http.client.HttpClient;
  * An implementation of {@link ClientTransport} that connects to a {@link ServerTransport} via a
  * Websocket.
  */
-public final class WebsocketClientTransport implements ClientTransport, TransportHeaderAware {
+public final class WebsocketClientTransport implements ClientTransport<WebsocketClientTransport>, TransportHeaderAware {
 
   private final HttpClient client;
 

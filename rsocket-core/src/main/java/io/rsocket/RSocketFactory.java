@@ -60,9 +60,9 @@ public class RSocketFactory {
   }
 
   public interface ClientTransportAcceptor {
-    Start<RSocket> transport(Supplier<ClientTransport> transport);
+    Start<RSocket> transport(Supplier<ClientTransport<?>> transport);
 
-    default Start<RSocket> transport(ClientTransport transport) {
+    default Start<RSocket> transport(ClientTransport<?> transport) {
       return transport(() -> transport);
     }
   }
@@ -154,7 +154,7 @@ public class RSocketFactory {
     }
 
     @Override
-    public Start<RSocket> transport(Supplier<ClientTransport> transportClient) {
+    public Start<RSocket> transport(Supplier<ClientTransport<?>> transportClient) {
       return new StartClient(transportClient);
     }
 
@@ -189,9 +189,9 @@ public class RSocketFactory {
     }
 
     private class StartClient implements Start<RSocket> {
-      private final Supplier<ClientTransport> transportClient;
+      private final Supplier<ClientTransport<?>> transportClient;
 
-      StartClient(Supplier<ClientTransport> transportClient) {
+      StartClient(Supplier<ClientTransport<?>> transportClient) {
         this.transportClient = transportClient;
       }
 

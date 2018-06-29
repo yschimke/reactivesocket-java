@@ -20,7 +20,11 @@ import io.rsocket.DuplexConnection;
 import reactor.core.publisher.Mono;
 
 /** A client contract for writing transports of RSocket. */
-public interface ClientTransport extends Transport {
+public interface ClientTransport<T extends ClientTransport<T>> extends Transport {
+
+  default T withDebug() {
+    return (T) this;
+  }
 
   /**
    * Returns a {@code Publisher}, every subscription to which returns a single {@code
